@@ -40,7 +40,7 @@ export function useFCMToken(userId: string | null) {
             const registration = await navigator.serviceWorker.ready;
 
             const currentToken = await getToken(messaging, {
-                vapidKey: 'BJ4lPz1Api3WOUP7sLqYm84nMt5B4LIP1JEUmguYhAFEaRO0nu0Tabcj8icd4iQuxnMKhkcZxSdkJmfUzBsJcls',
+                vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
                 serviceWorkerRegistration: registration
             });
 
