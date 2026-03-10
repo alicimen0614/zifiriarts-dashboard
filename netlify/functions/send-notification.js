@@ -57,7 +57,7 @@ export const handler = async (event) => {
         };
 
         // Send messages to all provided FCM tokens
-        const response = await admin.messaging().sendMulticast({
+        const response = await admin.messaging().sendEachForMulticast({
             tokens,
             ...payload
         });
