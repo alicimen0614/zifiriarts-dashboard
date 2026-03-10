@@ -84,6 +84,14 @@ export function useFCMToken(userId: string | null) {
             alert("Lütfen önce giriş yapın.");
             return;
         }
+
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+        const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+        if (isIOS && !isStandalone) {
+            alert("Apple cihazlarda bildirimleri açabilmek için öncelikle alt menüdeki 'Paylaş' butonuna basıp uygulamayı 'Ana Ekrana Ekle' yapmalısınız.");
+            return;
+        }
         try {
             const permission = await Notification.requestPermission();
             setPermissionStatus(permission);

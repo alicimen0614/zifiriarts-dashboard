@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogIn, AlertCircle } from 'lucide-react';
-import { signInWithPopup, setPersistence, browserLocalPersistence, signOut } from 'firebase/auth';
+import { signInWithRedirect, setPersistence, browserLocalPersistence, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 
 interface LoginProps {
@@ -20,6 +20,25 @@ export default function Login({ onLogin }: LoginProps) {
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    useEffect(() => {
+        import('firebase/auth').then(({ getRedirectResult }) => {
+            getRedirectResult(auth).then((result) => {
+                if (result) {
+                    const userEmail = result.user.email;
+                    if (userEmail && ALLOWED_EMAILS.includes(userEmail)) {
+                        onLogin(userEmail);
+                    } else {
+                        signOut(auth);
+                        setErrorMsg('Bu e-posta adresinin sisteme giriş yetkisi bulunmuyor.');
+                    }
+                }
+            }).catch((err) => {
+                console.error("Redirect login error", err);
+                setErrorMsg('Google ile giriş yapılırken bir hata oluştu.');
+            });
+        });
+    }, [onLogin]);
+
     const handleGoogleLogin = async () => {
         setIsLoading(true);
         setErrorMsg('');
@@ -27,17 +46,8 @@ export default function Login({ onLogin }: LoginProps) {
         try {
             await setPersistence(auth, browserLocalPersistence);
 
-            const result = await signInWithPopup(auth, googleProvider);
-            const userEmail = result.user.email;
-
-            // Whitelist Kontrolü
-            if (userEmail && ALLOWED_EMAILS.includes(userEmail)) {
-                onLogin(userEmail);
-            } else {
-                // Listede yoksa anında çıkış yaptır
-                await signOut(auth);
-                setErrorMsg('Bu e-posta adresinin sisteme giriş yetkisi bulunmuyor.');
-            }
+            // Using Redirect instead of Popup for iOS PWA compatibility
+            await signInWithRedirect(auth, googleProvider);
 
         } catch (err: any) {
             console.error("Login failed", err);
