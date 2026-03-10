@@ -39,10 +39,27 @@ export function useFCMToken(userId: string | null) {
             // We MUST wait for .ready so the SW is fully active. If it's still installing, Push registration fails with AbortError.
             const registration = await navigator.serviceWorker.ready;
 
-            const currentToken = await getToken(messaging, {
-                vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
-                serviceWorkerRegistration: registration
-            });
+            let currentToken = null;
+            try {
+                currentToken = await getToken(messaging, {
+                    vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
+                    serviceWorkerRegistration: registration
+                });
+            } catch (err: any) {
+                console.warn('getToken failed, attempting to clear old subscription and retry...', err);
+                // Clear the existing push subscription which might be tied to an old key
+                const subscription = await registration.pushManager.getSubscription();
+                if (subscription) {
+                    await subscription.unsubscribe();
+                    console.log('Unsubscribed from old push subscription.');
+                }
+                // Also clear the indexedDB token cache if possible, though getToken usually overwrites it.
+
+                currentToken = await getToken(messaging, {
+                    vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
+                    serviceWorkerRegistration: registration
+                });
+            }
 
             if (currentToken) {
                 setToken(currentToken);
