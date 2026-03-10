@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { LogIn, AlertCircle } from 'lucide-react';
-import { signInWithPopup, setPersistence, browserLocalPersistence, signOut } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
+import { LogIn, AlertCircle, KeyRound, Mail } from 'lucide-react';
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 interface LoginProps {
     onLogin: (email: string) => void;
@@ -17,19 +17,26 @@ const ALLOWED_EMAILS = [
 ];
 
 export default function Login({ onLogin }: LoginProps) {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    const handleEmailLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
 
+        if (!email.trim() || !password.trim()) {
+            setErrorMsg('Lütfen e-posta ve şifrenizi girin.');
+            return;
+        }
 
-    const handleGoogleLogin = async () => {
         setIsLoading(true);
         setErrorMsg('');
 
         try {
             await setPersistence(auth, browserLocalPersistence);
 
-            const result = await signInWithPopup(auth, googleProvider);
+            const result = await signInWithEmailAndPassword(auth, email.trim(), password);
             const userEmail = result.user.email;
 
             // Whitelist Kontrolü
@@ -43,8 +50,13 @@ export default function Login({ onLogin }: LoginProps) {
 
         } catch (err: any) {
             console.error("Login failed", err);
-            // Kapatma butonu veya ağ hatası
-            if (err.code !== 'auth/popup-closed-by-user') {
+
+            // Firebase Auth error handling
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                setErrorMsg('E-posta adresi veya şifre hatalı.');
+            } else if (err.code === 'auth/invalid-email') {
+                setErrorMsg('Geçersiz bir e-posta formatı.');
+            } else {
                 setErrorMsg('Giriş başarısız. Lütfen tekrar deneyin.');
             }
         } finally {
@@ -58,10 +70,10 @@ export default function Login({ onLogin }: LoginProps) {
                 <div className="login-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
                     <img src="/logo.jpg" alt="ZifiriArts Logo" className="login-logo" style={{ marginBottom: '1rem' }} />
                     <h2>Zifiri Sistemine Giriş</h2>
-                    <p className="text-secondary" style={{ marginTop: '0.5rem' }}>Ekip portalına hoş geldiniz. Devam etmek için yetkili Google hesabınızla giriş yapın.</p>
+                    <p className="text-secondary" style={{ marginTop: '0.5rem' }}>Ekip portalına hoş geldiniz. Sistemdeki hesabınızla giriş yapın.</p>
                 </div>
 
-                <div className="login-form" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                <form onSubmit={handleEmailLogin} className="login-form" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
                     {errorMsg && (
                         <div style={{ color: '#ef4444', fontSize: '0.9rem', textAlign: 'center', marginBottom: '15px', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                             <AlertCircle size={16} />
@@ -69,19 +81,46 @@ export default function Login({ onLogin }: LoginProps) {
                         </div>
                     )}
 
+                    <div className="form-group" style={{ width: '100%', marginBottom: '15px' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <Mail size={18} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                            <input
+                                type="email"
+                                placeholder="E-posta Adresi"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ width: '100%', marginBottom: '20px' }}>
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                            <KeyRound size={18} style={{ position: 'absolute', left: '12px', color: 'var(--text-secondary)' }} />
+                            <input
+                                type="password"
+                                placeholder="Şifre"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)' }}
+                                required
+                            />
+                        </div>
+                    </div>
+
                     <button
-                        type="button"
-                        onClick={handleGoogleLogin}
+                        type="submit"
                         className="btn-primary w-full login-btn"
                         disabled={isLoading}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', backgroundColor: '#ffffff', color: '#1a1a1a', border: '1px solid #ddd' }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
                     >
                         {isLoading ? (
                             'Giriş Yapılıyor...'
                         ) : (
                             <>
-                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style={{ width: '20px', height: '20px' }} />
-                                Google ile Giriş Yap
+                                <LogIn size={18} />
+                                Giriş Yap
                             </>
                         )}
                     </button>
@@ -89,7 +128,7 @@ export default function Login({ onLogin }: LoginProps) {
                     <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#6ab0ff', marginTop: '20px', opacity: 0.8 }}>
                         Yetkisiz girişler otomatik loglanmaktadır.
                     </p>
-                </div>
+                </form>
             </div>
         </div>
     );
