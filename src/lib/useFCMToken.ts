@@ -36,14 +36,8 @@ export function useFCMToken(userId: string | null) {
         }
 
         try {
-            // Explicitly wait for the service worker registration
-            let registration = await navigator.serviceWorker.getRegistration();
-            if (!registration) {
-                console.log("No SW registration found, manually registering...");
-                registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-                    scope: '/'
-                });
-            }
+            // We MUST wait for .ready so the SW is fully active. If it's still installing, Push registration fails with AbortError.
+            const registration = await navigator.serviceWorker.ready;
 
             const currentToken = await getToken(messaging, {
                 vapidKey: 'BJ4lPz1Api3WOUP7sLqYm84nMt5B4LIP1JEUmguYhAFEaRO0nu0Tabcj8icd4iQuxnMKhkcZxSdkJmfUzBsJcls',

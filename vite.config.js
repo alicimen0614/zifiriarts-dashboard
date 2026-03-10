@@ -18,6 +18,7 @@ export default defineConfig({
       manifest: {
         name: 'ZifiriArts',
         short_name: 'ZifiriArts',
+        gcm_sender_id: '103953800507',
         description: 'ZifiriArts Sipariş ve Takip Sistemi',
         theme_color: '#000000',
         background_color: '#ffffff',
