@@ -1,9 +1,11 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, onBackgroundMessage } from "firebase/messaging/sw";
 
-// We need this line to allow vite-plugin-pwa to inject the precache manifest
+import { precacheAndRoute } from 'workbox-precaching';
+
+// We need this line to allow vite-plugin-pwa to inject the precache manifest properly
 // @ts-ignore
-const precacheManifest = self.__WB_MANIFEST || [];
+precacheAndRoute(self.__WB_MANIFEST || []);
 
 const firebaseConfig = {
     apiKey: "AIzaSyDMz7qSsXY8dwq95fR9WHMMfqWYV9_jUTY",

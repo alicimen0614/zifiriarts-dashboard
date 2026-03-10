@@ -9,10 +9,7 @@ export default defineConfig({
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
-      filename: 'sw.js',
-      injectManifest: {
-        swDest: 'dist/firebase-messaging-sw.js',
-      },
+      filename: 'firebase-messaging-sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
