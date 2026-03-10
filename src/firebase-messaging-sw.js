@@ -1,7 +1,12 @@
 import { initializeApp } from "firebase/app";
 import { getMessaging, onBackgroundMessage } from "firebase/messaging/sw";
 
+import { clientsClaim, skipWaiting } from 'workbox-core';
 import { precacheAndRoute } from 'workbox-precaching';
+
+// Immediately claim clients so push notifications can register without reloading all tabs
+skipWaiting();
+clientsClaim();
 
 // We need this line to allow vite-plugin-pwa to inject the precache manifest properly
 // @ts-ignore

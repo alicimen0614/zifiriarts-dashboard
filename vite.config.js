@@ -10,6 +10,9 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'firebase-messaging-sw.js',
+      injectManifest: {
+        rollupFormat: 'iife'
+      },
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
