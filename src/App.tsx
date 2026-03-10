@@ -9,6 +9,7 @@ import { auth, db } from './lib/firebase';
 import { signOut } from 'firebase/auth';
 import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy } from 'firebase/firestore';
 import { useFCMToken } from './lib/useFCMToken';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import './index.css';
 
 // Mock Data Types
@@ -94,6 +95,19 @@ function App() {
     // Custom Drag State
     const [dragState, setDragState] = useState<{ order: Order, offsetX: number, offsetY: number, width: number } | null>(null);
     const ghostRef = useRef<HTMLDivElement>(null);
+
+    // Initialize PWA SW
+    const {
+        needRefresh: [needRefresh, setNeedRefresh],
+        updateServiceWorker,
+    } = useRegisterSW({
+        onRegistered(r) {
+            console.log('SW Registered: ', r)
+        },
+        onRegisterError(error) {
+            console.log('SW registration error', error)
+        },
+    });
 
     // Initial Auth Check & Save user to Firestore
     const { token, permissionStatus, requestPermission } = useFCMToken(isAuthenticated ? auth.currentUser?.uid || null : null);
