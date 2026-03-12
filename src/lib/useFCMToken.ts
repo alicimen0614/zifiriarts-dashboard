@@ -99,10 +99,13 @@ export function useFCMToken(userId: string | null) {
 
             if (currentToken) {
                 setToken(currentToken);
-                await setDoc(doc(db, 'users', uid), {
-                    fcmToken: currentToken
+                // Save to a separate collection to support multiple devices per user
+                await setDoc(doc(db, 'fcm_tokens', currentToken), {
+                    userId: uid,
+                    lastUpdated: new Date().toISOString(),
+                    platform: navigator.userAgent
                 }, { merge: true });
-                console.log("FCM Token saved successfully.");
+                console.log("FCM Token saved successfully to fcm_tokens collection.");
                 return currentToken;
             }
             return null;

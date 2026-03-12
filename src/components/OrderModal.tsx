@@ -135,12 +135,12 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
 
                 // Trigger Push Notification
                 try {
-                    // Fetch all users with fcmTokens
-                    const usersSnapshot = await getDocs(collection(db, 'users'));
+                    // Notify other team members via fcm_tokens collection
+                    const tokensSnapshot = await getDocs(collection(db, 'fcm_tokens'));
                     const tokenSet = new Set<string>();
-                    usersSnapshot.forEach(docSnap => {
-                        const token = docSnap.data().fcmToken;
-                        if (token) tokenSet.add(token);
+                    tokensSnapshot.forEach(docSnap => {
+                        // Use the document ID as the token
+                        tokenSet.add(docSnap.id);
                     });
                     const tokens = Array.from(tokenSet);
 
