@@ -50,6 +50,15 @@ export function useFCMToken(userId: string | null) {
         };
     }, []);
 
+    const getDeviceId = () => {
+        let deviceId = localStorage.getItem('fcm_device_id');
+        if (!deviceId) {
+            deviceId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            localStorage.setItem('fcm_device_id', deviceId);
+        }
+        return deviceId;
+    };
+
     const requestAndSaveToken = async (uid: string) => {
         try {
             const messaging = await getMessagingInstance();
@@ -99,13 +108,15 @@ export function useFCMToken(userId: string | null) {
 
             if (currentToken) {
                 setToken(currentToken);
-                // Save to a separate collection to support multiple devices per user
-                await setDoc(doc(db, 'fcm_tokens', currentToken), {
+                const deviceId = getDeviceId();
+                // Save to a separate collection using deviceId as the key to prevent duplicates
+                await setDoc(doc(db, 'fcm_tokens', deviceId), {
+                    token: currentToken,
                     userId: uid,
                     lastUpdated: new Date().toISOString(),
                     platform: navigator.userAgent
                 }, { merge: true });
-                console.log("FCM Token saved successfully to fcm_tokens collection.");
+                console.log("FCM Token saved successfully for device:", deviceId);
                 return currentToken;
             }
             return null;

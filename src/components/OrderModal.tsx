@@ -139,8 +139,8 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                     const tokensSnapshot = await getDocs(collection(db, 'fcm_tokens'));
                     const tokenSet = new Set<string>();
                     tokensSnapshot.forEach(docSnap => {
-                        // Use the document ID as the token
-                        tokenSet.add(docSnap.id);
+                        const tokenData = docSnap.data().token;
+                        if (tokenData) tokenSet.add(tokenData);
                     });
                     const tokens = Array.from(tokenSet);
 
