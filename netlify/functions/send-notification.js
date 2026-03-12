@@ -62,13 +62,23 @@ export const handler = async (event) => {
             ...payload
         });
 
+        if (response.failureCount > 0) {
+            console.error('Failed tokens details:');
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    console.error(`Token ${tokens[idx]}:`, resp.error);
+                }
+            });
+        }
+
         return {
             statusCode: 200,
             body: JSON.stringify({
                 success: true,
-                message: 'Notifications sent successfully',
+                message: 'Notifications processed',
                 successCount: response.successCount,
-                failureCount: response.failureCount
+                failureCount: response.failureCount,
+                results: response.responses.map(r => r.success ? 'success' : r.error.code)
             })
         };
 
