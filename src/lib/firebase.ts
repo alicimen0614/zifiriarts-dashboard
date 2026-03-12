@@ -1,4 +1,3 @@
-// C:\Users\alici\.gemini\antigravity\scratch\3d-print-tracker\src\lib\firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
@@ -19,10 +18,15 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
-// Initialize Firebase Cloud Messaging and handle potential not supported environments
-export let messaging: ReturnType<typeof getMessaging> | null = null;
-isSupported().then((supported) => {
-    if (supported) {
-        messaging = getMessaging(app);
+// Initialize Firebase Cloud Messaging
+export const getMessagingInstance = async () => {
+    try {
+        const supported = await isSupported();
+        if (supported) {
+            return getMessaging(app);
+        }
+    } catch (err) {
+        console.error("getMessagingInstance error:", err);
     }
-});
+    return null;
+};

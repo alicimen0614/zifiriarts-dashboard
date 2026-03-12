@@ -26,12 +26,16 @@ const messaging = getMessaging(app);
 
 onBackgroundMessage(messaging, (payload) => {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
-    const notificationTitle = payload.notification?.title || 'Yeni Bildirim';
-    const notificationOptions = {
-        body: payload.notification?.body,
-        icon: '/pwa-192x192.png'
-    };
-
-    // @ts-ignore
-    self.registration.showNotification(notificationTitle, notificationOptions);
+    // When the server sends a "notification" property, the OS (Android/iOS) 
+    // often handles showing the notification automatically.
+    // We only need to show it manually if we sent a "data-only" message.
+    if (!payload.notification) {
+        const notificationTitle = 'Yeni Bildirim';
+        const notificationOptions = {
+            body: payload.data?.message || 'Yeni bir siparişiniz var.',
+            icon: '/pwa-192x192.png'
+        };
+        // @ts-ignore
+        self.registration.showNotification(notificationTitle, notificationOptions);
+    }
 });

@@ -1,43 +1,72 @@
 import { useState, useEffect } from 'react';
-import { getToken, onMessage } from 'firebase/messaging';
-import { messaging, db } from './firebase';
+import { getToken, onMessage, isSupported } from 'firebase/messaging';
+import { getMessagingInstance, db } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 export function useFCMToken(userId: string | null) {
     const [token, setToken] = useState<string | null>(null);
+    const [isSupportedBrowser, setIsSupportedBrowser] = useState<boolean | null>(null);
     const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>(
         typeof Notification !== 'undefined' ? Notification.permission : 'default'
     );
 
     useEffect(() => {
-        // Escalate permissions if we already have it from before
-        if (permissionStatus === 'granted' && userId && messaging) {
+        const checkSupport = async () => {
+            const supported = await isSupported();
+            setIsSupportedBrowser(supported);
+        };
+        checkSupport();
+    }, []);
+
+    useEffect(() => {
+        if (isSupportedBrowser && permissionStatus === 'granted' && userId) {
             requestAndSaveToken(userId);
         }
-    }, [permissionStatus, userId]);
+    }, [userId, permissionStatus, isSupportedBrowser]);
 
     // Handle incoming messages while app is in foreground
     useEffect(() => {
-        if (!messaging) return;
-        const unsubscribe = onMessage(messaging, (payload) => {
-            console.log('Message received in foreground: ', payload);
-            // Optional: Show in-app toast notification here if desired
-        });
+        let unsubscribe: (() => void) | null = null;
+        
+        const setupListener = async () => {
+            const messaging = await getMessagingInstance();
+            if (messaging) {
+                unsubscribe = onMessage(messaging, (payload) => {
+                    console.log('Message received in foreground: ', payload);
+                    if (Notification.permission === 'granted') {
+                        new Notification(payload.notification?.title || 'Yeni Bildirim', {
+                            body: payload.notification?.body,
+                            icon: '/pwa-192x192.png'
+                        });
+                    }
+                });
+            }
+        };
+
+        setupListener();
 
         return () => {
-            unsubscribe();
+            if (unsubscribe) unsubscribe();
         };
     }, []);
 
     const requestAndSaveToken = async (uid: string) => {
-        if (!messaging) {
-            console.error("Messaging not supported on this device/browser");
-            return null;
-        }
-
         try {
-            // We MUST wait for .ready so the SW is fully active. If it's still installing, Push registration fails with AbortError.
-            const registration = await navigator.serviceWorker.ready;
+            const messaging = await getMessagingInstance();
+
+            if (!messaging || !isSupportedBrowser) {
+                return null;
+            }
+
+            // Timeout promise to prevent hanging forever
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error("SW_READY_TIMEOUT")), 5000)
+            );
+
+            const registration = await Promise.race([
+                navigator.serviceWorker.ready,
+                timeoutPromise
+            ]) as ServiceWorkerRegistration;
 
             let currentToken = null;
             try {
@@ -46,15 +75,11 @@ export function useFCMToken(userId: string | null) {
                     serviceWorkerRegistration: registration
                 });
             } catch (err: any) {
-                console.warn('getToken failed, attempting to clear old subscription and retry...', err);
-                // Clear the existing push subscription which might be tied to an old key
+                console.warn('FCM: getToken failed, retrying after unsubscribe...', err);
                 const subscription = await registration.pushManager.getSubscription();
                 if (subscription) {
                     await subscription.unsubscribe();
-                    console.log('Unsubscribed from old push subscription.');
                 }
-                // Also clear the indexedDB token cache if possible, though getToken usually overwrites it.
-
                 currentToken = await getToken(messaging, {
                     vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
                     serviceWorkerRegistration: registration
@@ -63,18 +88,15 @@ export function useFCMToken(userId: string | null) {
 
             if (currentToken) {
                 setToken(currentToken);
-                // Save the token to Firebase so the Send API knows who to send it to
                 await setDoc(doc(db, 'users', uid), {
                     fcmToken: currentToken
                 }, { merge: true });
                 console.log("FCM Token saved successfully.");
                 return currentToken;
-            } else {
-                console.log('No registration token available. Request permission to generate one.');
-                return null;
             }
+            return null;
         } catch (err) {
-            console.error('An error occurred while retrieving token. ', err);
+            console.error('FCM: Error occurred while retrieving token:', err);
             return null;
         }
     };
@@ -82,6 +104,11 @@ export function useFCMToken(userId: string | null) {
     const requestPermission = async () => {
         if (!userId) {
             alert("Lütfen önce giriş yapın.");
+            return;
+        }
+
+        if (isSupportedBrowser === false) {
+            alert("Bu tarayıcı veya cihaz bildirimleri desteklemiyor.");
             return;
         }
 
@@ -97,13 +124,11 @@ export function useFCMToken(userId: string | null) {
             setPermissionStatus(permission);
             if (permission === 'granted') {
                 await requestAndSaveToken(userId);
-            } else {
-                console.warn("User blocked notifications.");
             }
         } catch (error) {
             console.error("Failed to request permission", error);
         }
     };
 
-    return { token, permissionStatus, requestPermission };
+    return { token, permissionStatus, requestPermission, isSupportedBrowser };
 }

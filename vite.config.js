@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -14,11 +13,15 @@ export default defineConfig({
         rollupFormat: 'iife'
       },
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true,
+        type: 'module'
+      },
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: 'ZifiriArts',
         short_name: 'ZifiriArts',
-        gcm_sender_id: '339084266093',
+        gcm_sender_id: '103953800507',
         description: 'ZifiriArts Sipariş ve Takip Sistemi',
         theme_color: '#000000',
         background_color: '#ffffff',

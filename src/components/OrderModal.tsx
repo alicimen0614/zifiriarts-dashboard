@@ -137,19 +137,19 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                 try {
                     // Fetch all users with fcmTokens
                     const usersSnapshot = await getDocs(collection(db, 'users'));
-                    const tokens: string[] = [];
+                    const tokenSet = new Set<string>();
                     usersSnapshot.forEach(docSnap => {
-                        const userData = docSnap.data();
-                        if (userData.fcmToken) {
-                            tokens.push(userData.fcmToken);
-                        }
+                        const token = docSnap.data().fcmToken;
+                        if (token) tokenSet.add(token);
                     });
+                    const tokens = Array.from(tokenSet);
 
                     if (tokens.length > 0) {
                         // Call our Netlify Serverless Function
                         // In local dev, this will hit localhost:8888 if using netlify dev, 
                         // or it works relative to the domain in production.
-                        await fetch('/.netlify/functions/send-notification', {
+                        console.log(`Sending notification to ${tokens.length} tokens`);
+                        const response = await fetch('/.netlify/functions/send-notification', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -157,7 +157,11 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                                 message: `${customer} kişisinden ${title} siparişi eklendi.`,
                                 tokens: tokens
                             })
-                        }).catch(e => console.error("Notification API error", e));
+                        });
+                        const result = await response.json();
+                        console.log("Notification result:", result);
+                    } else {
+                        console.warn("No FCM tokens found in database.");
                     }
                 } catch (notifyErr) {
                     console.error("Bildirim gönderme hatası:", notifyErr);
