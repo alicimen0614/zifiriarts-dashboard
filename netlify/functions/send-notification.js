@@ -9,8 +9,12 @@ if (!admin.apps.length) {
     // Fallback: If no env var is found, we try to parse it from the body or use a dummy.
     // WARNING: For real production, you MUST set process.env.FIREBASE_SERVICE_ACCOUNT in Netlify!
     try {
-        const serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
+        let serviceAccountStr = process.env.FIREBASE_SERVICE_ACCOUNT;
         if (serviceAccountStr) {
+            // If it doesn't look like JSON, it might be Base64 encoded
+            if (!serviceAccountStr.trim().startsWith('{')) {
+                serviceAccountStr = Buffer.from(serviceAccountStr, 'base64').toString('utf8');
+            }
             const serviceAccount = JSON.parse(serviceAccountStr);
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount)

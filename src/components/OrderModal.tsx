@@ -148,8 +148,8 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                         // Call our Netlify Serverless Function
                         // In local dev, this will hit localhost:8888 if using netlify dev, 
                         // or it works relative to the domain in production.
-                        console.log(`Sending notification to ${tokens.length} tokens`);
-                        const response = await fetch('/.netlify/functions/send-notification', {
+                        console.log(`Sending notification to ${tokens.length} tokens via Cloudflare`);
+                        const response = await fetch('/api/send-notification', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
