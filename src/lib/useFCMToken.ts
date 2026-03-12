@@ -76,14 +76,25 @@ export function useFCMToken(userId: string | null) {
                 });
             } catch (err: any) {
                 console.warn('FCM: getToken failed, retrying after unsubscribe...', err);
-                const subscription = await registration.pushManager.getSubscription();
-                if (subscription) {
-                    await subscription.unsubscribe();
+                try {
+                    const subscription = await registration.pushManager.getSubscription();
+                    if (subscription) {
+                        await subscription.unsubscribe();
+                        console.log("FCM: Unsubscribed from old push subscription.");
+                    }
+                    // Add a small delay
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    currentToken = await getToken(messaging, {
+                        vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
+                        serviceWorkerRegistration: registration
+                    });
+                } catch (retryErr: any) {
+                    console.error('FCM: Retry getToken failed:', retryErr);
+                    if (retryErr.message.includes('push service error')) {
+                        console.error('FCM: This is a browser/network level push error. Please try clearing site data or checking if your browser/VPN blocks Google Push services.');
+                    }
                 }
-                currentToken = await getToken(messaging, {
-                    vapidKey: 'BJQZNUC1b25tsLg2Udal0MsVDsvSJz9ph_ux1S4hMo9IHa5FdTc1Nk9cTkzQhhpQGmqZ4KeYMkXu3P9EYsANhog',
-                    serviceWorkerRegistration: registration
-                });
             }
 
             if (currentToken) {
