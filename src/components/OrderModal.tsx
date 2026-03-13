@@ -28,6 +28,7 @@ interface Order {
     time: number;
     color?: string;
     assignee?: string;
+    isAccountingized?: boolean;
 }
 
 interface OrderModalProps {
@@ -76,6 +77,8 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
         });
         return () => unsubscribe();
     }, []);
+
+    const isAccountingized = editOrder?.isAccountingized || false;
 
     // Pre-fill form when editing
     useEffect(() => {
@@ -204,11 +207,17 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                     </button>
                 </div>
 
+                {isAccountingized && (
+                    <div className="alert alert-warning" style={{ margin: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b', fontSize: '0.85rem' }}>
+                        ⚠️ Bu sipariş muhasebeleştirildiği için bilgiler değiştirilemez.
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="modal-form">
                     <div className="form-group">
                         <label>Ürün Seç <span className="text-danger">*</span></label>
                         <select
-                            disabled={isSaving || isDeleting}
+                            disabled={isSaving || isDeleting || isAccountingized}
                             value={selectedProductId}
                             onChange={e => {
                                 const pid = e.target.value;
@@ -240,7 +249,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                             <input
                                 type="text"
                                 required
-                                disabled={isSaving || isDeleting}
+                                disabled={isSaving || isDeleting || isAccountingized}
                                 placeholder="Örn: Iron Man Kaskı"
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
@@ -253,7 +262,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                         <input
                             type="text"
                             required
-                            disabled={isSaving || isDeleting}
+                            disabled={isSaving || isDeleting || isAccountingized}
                             placeholder="Müşteri ad soyad veya firma"
                             value={customer}
                             onChange={e => setCustomer(e.target.value)}
@@ -264,7 +273,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                         <div className="form-group">
                             <label>Filament Türü</label>
                             <select
-                                disabled={isSaving || isDeleting}
+                                disabled={isSaving || isDeleting || isAccountingized}
                                 value={color}
                                 onChange={e => setColor(e.target.value)}
                             >
@@ -276,7 +285,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                         <div className="form-group">
                             <label>Sorumlu Kişi</label>
                             <select
-                                disabled={isSaving || isDeleting}
+                                disabled={isSaving || isDeleting || isAccountingized}
                                 value={assignee}
                                 onChange={e => setAssignee(e.target.value)}
                             >
@@ -296,7 +305,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                             <input
                                 type="number"
                                 min="0"
-                                disabled={isSaving || isDeleting}
+                                disabled={isSaving || isDeleting || isAccountingized}
                                 placeholder="Örn: 250"
                                 value={weight}
                                 onChange={e => setWeight(Number(e.target.value))}
@@ -308,7 +317,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                                 type="number"
                                 min="0"
                                 step="0.5"
-                                disabled={isSaving || isDeleting}
+                                disabled={isSaving || isDeleting || isAccountingized}
                                 placeholder="Örn: 14.5"
                                 value={time}
                                 onChange={e => setTime(Number(e.target.value))}
@@ -322,7 +331,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                             type="number"
                             min="0"
                             step="0.01"
-                            disabled={isSaving || isDeleting}
+                            disabled={isSaving || isDeleting || isAccountingized}
                             placeholder="Örn: 150"
                             value={price}
                             onChange={e => setPrice(Number(e.target.value))}
@@ -330,7 +339,7 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                     </div>
 
                     <div className="modal-actions">
-                        {isEditMode && (
+                        {isEditMode && !isAccountingized && (
                             <button
                                 type="button"
                                 onClick={handleDelete}
@@ -342,9 +351,11 @@ export default function OrderModal({ isOpen, onClose, editOrder }: OrderModalPro
                         )}
                         <div style={{ flex: 1 }} />
                         <button type="button" onClick={onClose} disabled={isSaving || isDeleting} className="btn-secondary">İptal</button>
-                        <button type="submit" disabled={isSaving || isDeleting} className="btn-primary">
-                            {isSaving ? "Kaydediliyor..." : <><Save size={16} /> Kaydet</>}
-                        </button>
+                        {!isAccountingized && (
+                            <button type="submit" disabled={isSaving || isDeleting} className="btn-primary">
+                                {isSaving ? "Kaydediliyor..." : <><Save size={16} /> Kaydet</>}
+                            </button>
+                        )}
                     </div>
                 </form>
             </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { PlusCircle, Clock, Printer, PackageCheck, LogOut, ChevronRight, ChevronLeft, Filter, Search, Calendar, X, Package, LayoutDashboard, Wallet, Bell, BellRing } from 'lucide-react';
+import { PlusCircle, Clock, Printer, PackageCheck, LogOut, ChevronRight, ChevronLeft, Filter, Search, Calendar, X, Package, LayoutDashboard, Wallet, Bell, BellRing, Settings } from 'lucide-react';
 import Login from './components/Login';
 import OrderModal from './components/OrderModal';
 import ProductsPage, { ProductModal } from './components/ProductsPage';
@@ -7,9 +7,11 @@ import type { Product } from './components/ProductsPage';
 import KasaPage, { AddExpenseModal, PendingModal, BorrowsModal } from './components/KasaPage';
 import { auth, db } from './lib/firebase';
 import { signOut } from 'firebase/auth';
-import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { useFCMToken } from './lib/useFCMToken';
+import { broadcastNotification } from './lib/broadcast';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import SettingsModal from './components/SettingsModal';
 import './index.css';
 
 // Mock Data Types
@@ -43,6 +45,7 @@ interface Order {
     color?: string;
     assignee?: string;
     createdAt?: any; // Firestore Timestamp or string
+    isAccountingized?: boolean;
 }
 
 // Firestore Timestamp → YYYY-MM-DD string
@@ -71,6 +74,7 @@ function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userEmail, setUserEmail] = useState('');
     const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     // Real orders from Firestore
     const [orders, setOrders] = useState<Order[]>([]);
@@ -85,6 +89,9 @@ function App() {
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
     const [isBorrowsModalOpen, setIsBorrowsModalOpen] = useState(false);
+    const [borrowsModalType, setBorrowsModalType] = useState<'receivable' | 'payable' | undefined>(undefined);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [kasaSorumlusu, setKasaSorumlusu] = useState<{ uid: string, displayName: string, email: string } | null>(null);
 
     // Delivery confirmation dialog
     const [deliveryDialog, setDeliveryDialog] = useState<{ order: Order; finalPrice: number; addToKasa: boolean; isPromo: boolean; notPaid: boolean } | null>(null);
@@ -111,6 +118,8 @@ function App() {
 
     // Initial Auth Check & Save user to Firestore
     const { token, permissionStatus, requestPermission } = useFCMToken(isAuthenticated ? auth.currentUser?.uid || null : null);
+    const currentUser = auth.currentUser;
+
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user && user.email) {
@@ -120,7 +129,6 @@ function App() {
                 try {
                     await setDoc(doc(db, 'users', user.uid), {
                         email: user.email,
-                        displayName: user.displayName || user.email.split('@')[0],
                         lastLogin: new Date().toISOString()
                     }, { merge: true });
                 } catch (e) {
@@ -129,11 +137,37 @@ function App() {
             } else {
                 setIsAuthenticated(false);
                 setUserEmail('');
+                setIsAdmin(false);
             }
             setIsAuthLoading(false);
         });
         return () => unsubscribe();
     }, []);
+
+    // Listen to the user document for isAdmin status
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
+            if (userDoc.exists()) {
+                setIsAdmin(userDoc.data().isAdmin === true);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [isAuthenticated]);
+
+    // Fetch Global Settings
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
+            if (doc.exists()) {
+                setKasaSorumlusu(doc.data().kasaSorumlusu || null);
+            }
+        });
+        return () => unsubscribe();
+    }, [isAuthenticated]);
 
     // Fetch Orders from Firestore
     useEffect(() => {
@@ -175,9 +209,14 @@ function App() {
     };
 
     const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+        const order = orders.find(o => o.id === orderId);
+        if (order?.isAccountingized) {
+            alert('Bu sipariş muhasebeleştirildiği için durumu değiştirilemez.');
+            return;
+        }
+
         // If moving to 'delivered', show confirmation dialog
         if (newStatus === 'delivered') {
-            const order = orders.find(o => o.id === orderId);
             if (order) {
                 setDeliveryDialog({
                     order,
@@ -216,14 +255,42 @@ function App() {
 
             // Add to kasa if checked
             if (addToKasa && finalPrice > 0) {
-                await addDoc(collection(db, 'kasa'), {
+                const kasaEntry: any = {
                     orderId: order.id,
                     orderTitle: order.title,
                     customer: order.customer,
                     amount: finalPrice,
-                    type: 'income',
-                    createdAt: new Date().toISOString()
-                });
+                    type: kasaSorumlusu ? 'waiting_approval' : 'income',
+                    originalType: 'income',
+                    createdAt: new Date().toISOString(),
+                    status: kasaSorumlusu ? 'pending' : 'approved'
+                };
+                await addDoc(collection(db, 'kasa'), kasaEntry);
+
+                if (kasaSorumlusu) {
+                    try {
+                        const tokensSnapshot = await getDocs(query(collection(db, 'fcm_tokens'), where('userId', '==', kasaSorumlusu.uid)));
+                        const tokens: string[] = [];
+                        tokensSnapshot.forEach(d => { if (d.data().token) tokens.push(d.data().token); });
+
+                        if (tokens.length > 0) {
+                            await fetch('/api/send-notification', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    title: 'Kasa Onayı Bekliyor',
+                                    message: `${order.customer} - ${order.title} için ${finalPrice}₺ ödeme onayı bekleniyor.`,
+                                    tokens
+                                })
+                            });
+                        }
+                    } catch (notifyErr) {
+                        console.error('Notification error:', notifyErr);
+                    }
+                } else {
+                    // GLOBAL BROADCAST: Notify all users
+                    broadcastNotification('Kasaya Gelir Girdi', `${order.customer} - ${order.title} siparişi için ${finalPrice}₺ ödeme alındı.`);
+                }
             }
 
             // Add as pending payment if not paid
@@ -417,6 +484,21 @@ function App() {
                             {permissionStatus === 'granted' ? <BellRing size={18} /> : <Bell size={18} />}
                         </button>
 
+                        {isAdmin && (
+                            <button className="btn-secondary" onClick={() => setIsSettingsModalOpen(true)} title="Ayarlar" style={{
+                                background: 'transparent',
+                                border: '1px solid var(--border-color)',
+                                color: 'var(--text-secondary)',
+                                padding: '0.5rem',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}>
+                                <Settings size={18} />
+                            </button>
+                        )}
+
                         <button className="btn-secondary" onClick={handleLogout} title="Çıkış Yap" style={{
                             background: 'transparent',
                             border: '1px solid var(--border-color)',
@@ -438,13 +520,27 @@ function App() {
                 <ProductModal onClose={() => { setIsProductModalOpen(false); setEditingProduct(null); }} editProduct={editingProduct} />
             )}
             {isExpenseModalOpen && (
-                <AddExpenseModal onClose={() => setIsExpenseModalOpen(false)} />
+                <AddExpenseModal onClose={() => setIsExpenseModalOpen(false)} kasaSorumlusu={kasaSorumlusu} />
             )}
             {isPendingModalOpen && (
-                <PendingModal onClose={() => setIsPendingModalOpen(false)} setGlobalConfirmDialog={setGlobalConfirmDialog} />
+                <PendingModal 
+                    onClose={() => setIsPendingModalOpen(false)} 
+                    setGlobalConfirmDialog={setGlobalConfirmDialog} 
+                    kasaSorumlusu={kasaSorumlusu} 
+                    currentUserUid={currentUser?.uid || ''}
+                />
             )}
             {isBorrowsModalOpen && (
-                <BorrowsModal onClose={() => setIsBorrowsModalOpen(false)} setGlobalConfirmDialog={setGlobalConfirmDialog} />
+                <BorrowsModal 
+                    onClose={() => setIsBorrowsModalOpen(false)} 
+                    setGlobalConfirmDialog={setGlobalConfirmDialog} 
+                    kasaSorumlusu={kasaSorumlusu} 
+                    defaultType={borrowsModalType}
+                    currentUserUid={currentUser?.uid || ''}
+                />
+            )}
+            {isSettingsModalOpen && (
+                <SettingsModal onClose={() => setIsSettingsModalOpen(false)} />
             )}
 
             {/* Delivery Confirmation Dialog */}
@@ -559,8 +655,13 @@ function App() {
                     <KasaPage
                         onAddExpense={() => setIsExpenseModalOpen(true)}
                         onOpenPending={() => setIsPendingModalOpen(true)}
-                        onOpenBorrows={() => setIsBorrowsModalOpen(true)}
+                        onOpenBorrows={(type) => { 
+                            setBorrowsModalType(type);
+                            setIsBorrowsModalOpen(true); 
+                        }}
                         setGlobalConfirmDialog={setGlobalConfirmDialog}
+                        kasaSorumlusu={kasaSorumlusu}
+                        currentUserUid={currentUser?.uid || ''}
                     />
                 ) : (
                     <>
